@@ -1,7 +1,5 @@
-# Faldony
-
 <p align="center">
-  <img src="assets/faldony_logo.jpg" alt="Faldony" width="200">
+  <img src="assets/faldony_logo.jpg" alt="Faldony" width="500">
 </p>
 
 <p align="center">
