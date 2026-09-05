@@ -1,0 +1,200 @@
+﻿networks:
+  faldony:
+    driver: bridge
+
+services:
+
+  # Helpers
+
+  log-writer:
+    image: docker:cli
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./logs:/logs
+      - .:/compose:ro
+    working_dir: /compose
+    command: >
+      sh -c 'docker compose -p deploy logs -f --no-color --timestamps > /logs/compose-$$(date +%Y%m%d-%H%M%S).log'
+    restart: unless-stopped
+
+  netshoot:
+    image: nicolaka/netshoot
+    container_name: netshoot
+    # Host mode (Docker Desktop 4.34+ opt-in)
+    # puts tcpdump on the VM's real netns, so it sees the actual faldony bridge,
+    # incl. container-to-container traffic. The bridge name is resolved via the
+    # Docker API (no compose DNS / docker CLI inside the host netns).
+    network_mode: host
+    volumes:
+      - ./pcaps:/pcaps
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command: >
+      sh -c '
+        BR=$$(curl -s --unix-socket /var/run/docker.sock "http://localhost/networks/deploy_faldony" | grep -o "\"Id\":\"[a-f0-9]*\"" | tr -d \" | cut -c 4-15)
+        BR=$${BR:+br-$$BR}
+        BR=$${BR:-any}
+        echo "capturing on $$BR"
+        tcpdump -i $$BR -e -nn -s 0 \
+          "tcp port 8080 or tcp port 8081 or tcp port 5001" \
+          -w /pcaps/stack-$$(date +%Y%m%d-%H%M%S).pcap -G 3600 -W 24
+      '
+    restart: unless-stopped
+
+  # --------------------------------------------------------------------------
+
+  # Core
+
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: postgres
+    hostname: postgres
+    mem_limit: 1536m
+    # Self-diagnostics: connection/checkpoint/statement logging and verbose
+    # error detail, so a future backend death leaves a trace.
+    command:
+      - postgres
+      - -c
+      - log_connections=on
+      - -c
+      - log_disconnections=on
+      - -c
+      - log_checkpoints=on
+      - -c
+      - log_error_verbosity=verbose
+      - -c
+      - log_lock_waits=on
+      - -c
+      - log_min_duration_statement=1000
+      - -c
+      - log_line_prefix=%m [%p]
+    environment:
+      POSTGRES_DB: Faldony_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d Faldony_db" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    volumes:
+      - ./data/pg:/var/lib/postgresql/data
+    networks:
+      - faldony
+    ports:
+      - "5432:5432" # Note: Used in tests
+    restart: always
+
+  temporal:
+    image: temporalio/auto-setup:latest
+    container_name: temporal
+    hostname: temporal
+    mem_limit: 1g
+    environment:
+      - LOG_LEVEL=warn   # warn, error, fatal only (info no longer emitted)
+      - DB=postgres12_pgx # or postgres12
+      - DB_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PWD=${POSTGRES_PASSWORD}
+      - POSTGRES_SEEDS=postgres
+    healthcheck:
+      test: [ "CMD", "temporal", "operator", "cluster", "health", "--address", "temporal:7233" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - faldony
+    restart: always
+
+  docling-serve:
+    image: quay.io/docling-project/docling-serve:latest
+    container_name: docling-serve
+    mem_limit: 4g
+    healthcheck:
+      test: [ "CMD-SHELL", "curl --fail http://localhost:5001/ready || exit 1" ]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks:
+      - faldony
+    restart: always
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    image: faldony-backend:local
+    container_name: faldony-backend
+    mem_limit: 5g
+    depends_on:
+      postgres:
+        condition: service_healthy
+      temporal:
+        condition: service_healthy
+      docling-serve:
+        condition: service_healthy
+    environment:
+      # Every faldony.* config value must come from here (application.yaml has
+      # no defaults): non-secrets are passed DIRECTLY, secrets come from
+      # deploy/.env (see .env.example).
+      SERVER_PORT: 8081
+      DB_URL: jdbc:postgresql://postgres:5432/Faldony_db
+      DB_USERNAME: postgres
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DOCLING_SERVE_URL: http://docling-serve:5001
+      FALDONY_DATA_DIR: /data
+      FALDONY_VERIFY_ON_DOWNLOAD: "true"
+      FALDONY_MAX_UPLOAD_BYTES: "52428800"
+      FALDONY_RATE_LIMIT_ENABLED: "true"
+      FALDONY_RATE_LIMIT_CAPACITY: "30"
+      FALDONY_SEARCH_WINDOW: "500"
+      FALDONY_SEARCH_STREAM_BATCH_SIZE: "100"
+      FALDONY_EMBEDDING_MODEL: multilingual-e5-base-v1
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_ISSUER_URI: ${GOOGLE_ISSUER_URI}
+      FALDONY_AUTH_WHITELIST: ${FALDONY_AUTH_WHITELIST}
+      TEMPORAL_CONNECTION_TARGET: temporal:7233
+      TEMPORAL_NAMESPACE: default
+      # Model is baked into the image at build time (see backend/Dockerfile):
+      # file:// URIs, Spring AI download cache disabled
+      ONNX_MODEL_URI: file:///models/model.onnx
+      ONNX_TOKENIZER_URI: file:///models/tokenizer.json
+      SPRING_AI_EMBEDDING_TRANSFORMER_CACHE_ENABLED: "false"
+    volumes:
+      - ./data:/data
+    healthcheck:
+      test: [ "CMD-SHELL", "curl --fail http://localhost:8081/actuator/health || exit 1" ]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 120s # ONNX model load into memory at boot is the slow part
+    ports:
+      - "8081:8081" # host-published for LOCAL DEV: the host webpack-dev-server proxies /api to it
+    networks:
+      - faldony
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ../frontendKMP
+      dockerfile: Dockerfile
+      args:
+        # Build-time auth config (baked into the KMP build via
+        # generateAuthConfig); REQUIRED by the Gradle build.
+        GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+    image: faldony-frontend:local
+    container_name: faldony-frontend
+    mem_limit: 512m
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "8080:80" # The only port the browser needs: nginx serves the app and proxies /api/ to backend
+    networks:
+      - faldony
+    restart: unless-stopped

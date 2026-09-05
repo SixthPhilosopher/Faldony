@@ -1,0 +1,96 @@
+<resources>
+    <!-- Login screen -->
+    <string name="login_title">Sign in to Faldony</string>
+    <string name="login_subtitle">Your document archive is locked. Sign in with Google to open it — only whitelisted accounts are allowed.</string>
+    <string name="login_available_offline">Google sign-in is not configured on this deployment.</string>
+
+    <!-- Documents screen -->
+    <string name="documents_title">Documents</string>
+    <string name="documents_subtitle">%1$d documents</string>
+    <string name="search_placeholder">Search documents by title, party or tag…</string>
+    <string name="regenerate_data">Refresh</string>
+    <string name="switch_to_light">Switch to light mode</string>
+    <string name="switch_to_dark">Switch to dark mode</string>
+    <string name="upload_button">Upload</string>
+
+    <string name="tab_documents">Documents</string>
+    <string name="tab_processing">Processing</string>
+    <string name="stream_live_status">Live via SSE · %1$d documents</string>
+    <string name="stream_closed_status">Stream closed · %1$d documents</string>
+    <string name="stream_truncated_status">Top %1$d ranked results — more matches may exist</string>
+    <string name="stream_error_status">Stream error — showing cached results. Tap the refresh button.</string>
+    <string name="no_documents">No documents</string>
+    <string name="document_indexed">Document indexed</string>
+
+    <!-- Upload dialog -->
+    <string name="upload_title">Upload a document</string>
+    <string name="upload_pick_file">Pick a file to upload…</string>
+    <string name="upload_file">%1$s (%2$s)</string>
+    <string name="upload_reading">Reading %1$s…</string>
+    <string name="upload_title_label">Title</string>
+    <string name="uploading">Uploading…</string>
+    <string name="processing">Processing…</string>
+    <string name="upload_done">Document indexed</string>
+    <string name="upload_failed">Upload failed: %1$s</string>
+    <string name="close">Close</string>
+    <string name="download">Download</string>
+
+    <string name="upload_parties">Parties</string>
+    <string name="upload_tags">Tags</string>
+    <string name="upload_collections">Collections</string>
+    <string name="quick_create_party">Add the party to your library</string>
+    <string name="new_party_name">Party name</string>
+    <string name="new_party_emails">Emails (comma separated)</string>
+    <string name="quick_create_tag">Add the tag to your library</string>
+    <string name="new_tag_name">Tag name</string>
+    <string name="create">Create</string>
+
+    <!-- Table columns -->
+    <string name="column_created">Created</string>
+    <string name="column_last_update">Last update</string>
+    <string name="column_title">Title</string>
+    <string name="column_type">Type</string>
+    <string name="column_pages">Pages</string>
+    <string name="column_parties">Parties</string>
+    <string name="column_tags">Tags</string>
+    <string name="sorted_ascending">sorted ascending</string>
+    <string name="sorted_descending">sorted descending</string>
+
+    <!-- Details drawer -->
+    <string name="detail_document_id">Document #%1$d</string>
+    <string name="action_refresh_details">Refresh details</string>
+    <string name="action_edit_title">Edit title</string>
+    <string name="action_save_title">Save</string>
+    <string name="field_title">Title</string>
+    <string name="field_type">Type</string>
+    <string name="field_pages">Pages</string>
+    <string name="field_created_at">Created at</string>
+    <string name="field_last_update">Last update</string>
+    <string name="field_parties">Parties</string>
+    <string name="field_tags">Tags</string>
+    <string name="field_collections">Collections</string>
+    <string name="preview_title">Preview</string>
+    <string name="preview_loading">Loading preview…</string>
+    <string name="preview_unavailable">No preview available for this file type</string>
+    <string name="preview_open_tab">Open in new tab</string>
+    <string name="preview_overlay_hint">PDF preview</string>
+    <string name="action_add_party">Add party</string>
+    <string name="action_add_tag">Add tag</string>
+
+    <!-- Processing screen -->
+    <string name="processing_queue_title">Active jobs</string>
+    <string name="processing_history_title">History</string>
+    <string name="queue_empty">Nothing is currently processing</string>
+    <string name="history_empty">No processed documents yet</string>
+    <string name="stage_queued">QUEUED</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_retry">Retry</string>
+    <string name="action_open">Open</string>
+    <string name="load_more">Load more</string>
+
+    <!-- Column filter autocomplete -->
+    <string name="filter_placeholder">Filter…</string>
+    <string name="loading_options">Loading…</string>
+    <string name="no_results">No results</string>
+    <string name="remove_entity">Remove %1$s</string>
+</resources>

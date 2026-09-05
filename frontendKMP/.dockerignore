@@ -1,0 +1,4 @@
+# Keep the build context small and prevent stale artifacts from entering the image.
+.gradle
+.kotlin
+build

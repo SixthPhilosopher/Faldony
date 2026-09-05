@@ -1,0 +1,195 @@
+# ALL CONFIGURATION VARIABLES MUST BE PROVIDED VIA deploy/docker-compose.yml (No defaults allowed here)
+###########################################################
+faldony:
+  auth:
+    # Allow-list of Google identities (env: FALDONY_AUTH_WHITELIST, space/comma
+    # separated). Canonical entries are Google `sub` values; entries containing
+    # '@' are matched against the email claim as a convenience (email can
+    # change - prefer subs in production). An EMPTY list denies every
+    # identity, always (fail closed).
+    whitelist: ${FALDONY_AUTH_WHITELIST}
+  storage:
+    # Single-node file store (MinIO removed). Directory where originals and
+    # claim-check scratch live. Must exist / be creatable at startup.
+    base-dir: ${FALDONY_DATA_DIR}
+    # Download-time integrity: re-hash the stored bytes against the row's
+    # file_hash before serving; mismatch => document + object are deleted.
+    verify-on-download: ${FALDONY_VERIFY_ON_DOWNLOAD}
+  upload:
+    # Business cap (bytes) enforced by the upload endpoint; the container-level
+    # guard is spring.web.multipart.max-file-size below.
+    max-size-bytes: ${FALDONY_MAX_UPLOAD_BYTES}
+  rate-limit:
+    # Per-IP token bucket (in-memory; single-instance deployment).
+    enabled: ${FALDONY_RATE_LIMIT_ENABLED}
+    # Tokens in the bucket, refilled greedily at `capacity` per minute.
+    capacity: ${FALDONY_RATE_LIMIT_CAPACITY}
+  search:
+    # Fixed ranking window (top-k per retriever) — an internal DEPLOYMENT
+    # constant that bounds the work of a ranked search. Never exposed to
+    # clients: the ranked stream simply ends (the `done` event reports whether
+    # more matches may exist beyond the window). Browse (no q) is uncapped.
+    window: ${FALDONY_SEARCH_WINDOW}
+    # SSE stream: how many docs are hydrated per DB roundtrip before emitting.
+    stream-batch-size: ${FALDONY_SEARCH_STREAM_BATCH_SIZE}
+    # Human-readable embedding model tag used to key the query-embedding cache.
+    embedding-model: ${FALDONY_EMBEDDING_MODEL}
+  docling:
+    base-url: ${DOCLING_SERVE_URL}
+
+###########################################################
+
+server:
+  port: ${SERVER_PORT}
+  shutdown: graceful
+  compression:
+    enabled: true
+    min-response-size: 1024
+    mime-types: application/json,application/xml,text/html,text/xml,text/plain
+
+###########################################################
+
+spring:
+  application:
+    name: Faldony
+
+  output:
+    ansi:
+      enabled: ALWAYS
+
+  # Enable virtual threads for all web & async task execution (Java 21+)
+  threads:
+    virtual:
+      enabled: true
+
+  cache:
+    # In-process Caffeine cache (see FaldonyApplication @EnableCaching).
+    # TTL + size are configured HERE, not in code, so they can be tuned per
+    # environment without a rebuild. Used by the query-embeddings cache
+    # (`queryEmbeddings`): pagination re-embeds the same query on every page
+    # (~50-200ms ONNX each), and reusing the SAME cached vector across a
+    # cursor sequence prevents ranks from drifting mid-pagination.
+    type: caffeine
+    caffeine:
+      spec: expireAfterWrite=10m,maximumSize=512
+
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 51MB
+      file-size-threshold: 1MB
+
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    hikari:
+      pool-name: FaldonyHikariPool
+      maximum-pool-size: 10
+      minimum-idle: 2
+      # Max lifetime should be slightly shorter than database/firewall TCP idle timeouts
+      max-lifetime: 1800000 # 30 mins
+      connection-timeout: 20000 # 20s reported during the 2026-09-04 PG recovery
+      # Fail fast on idle connections the server already killed during a PG
+      # crash/restart window instead of handing out dead sockets.
+      validation-timeout: 3000
+      initialization-fail-timeout: 10000
+      # Warn if a transaction/thread holds a DB connection longer than 5 seconds
+      leak-detection-threshold: 5000
+
+  jpa:
+    open-in-view: false
+    # Schema is owned by Flyway (db/migration): Hibernate never writes DDL,
+    # but VALIDATES entities against the real schema on every boot so entity
+    # changes that lack a matching migration fail loudly instead of silently
+    # drifting.
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+
+  flyway:
+    enabled: true
+    # Never apply a modified migration silently (checksum drift fails boot).
+    validate-on-migrate: true
+    # Flyway can never destroy the schema.
+    clean-disabled: true
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${GOOGLE_ISSUER_URI}
+          # Native `aud` validation: the auto-configured Nimbus decoder checks
+          # that the token's audience contains our Google client id — no custom
+          # JwtValidator code needed.
+          audiences: ${GOOGLE_CLIENT_ID}
+
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+
+  ai:
+    embedding:
+      transformer:
+        # Local ONNX model baked into the image (models/onnx). No runtime/HF
+        # download, no per-container re-download, no cache-volume needed.
+        # model_O4.onnx is the fp32 768-dim model at ~half the onnx/model.onnx
+        # model_O4.onnx is crashing ONNX runtime due to a missing weight in the optimized graph.
+        # Reverting to the standard model.onnx which works perfectly.
+        onnx:
+          model-uri: ${ONNX_MODEL_URI}
+        tokenizer:
+          uri: ${ONNX_TOKENIZER_URI}
+
+  temporal:
+    namespace: ${TEMPORAL_NAMESPACE}
+    connection:
+      target: ${TEMPORAL_CONNECTION_TARGET}
+    # Workers are AUTO-DISCOVERED from the annotated impls
+    # (@WorkflowImpl/@ActivityImpl in these packages) — no per-class yaml lists.
+    workers-auto-discovery:
+      enabled: true
+      workflow-packages:
+        - com.kiss.backend.temporal.workflow
+      register-activity-beans: true
+    workers:
+      - task-queue: faldony
+        name: faldony-worker
+        capacity:
+          max-concurrent-workflow-task-executors: 10
+          max-concurrent-activity-executors: 4
+          max-concurrent-local-activity-executors: 2
+
+###########################################################
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when-authorized
+      probes:
+        enabled: true
+
+###########################################################
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+
+###########################################################
+
+logging:
+  level:
+    org.hibernate.SQL: INFO
+    org.hibernate.tool.hbm2ddl: WARN
+
+  pattern:
+    console: "%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr([%thread]){magenta} %clr(%-5level) %clr([%X{requestId}]){yellow} %clr(%logger{36}){cyan} - %msg%n%xEx{5}"

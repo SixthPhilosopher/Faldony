@@ -1,0 +1,44 @@
+# Test-only config: supplies the env-driven placeholders every context test
+# needs so tests run without docker-compose / shell env (activate with
+# @ActiveProfiles("test")). Values are inert fakes.
+faldony:
+  auth:
+    whitelist: "test-sub"
+  storage:
+    base-dir: ${java.io.tmpdir}/faldony-test
+    verify-on-download: false
+  docling:
+    base-url: "http://localhost:9999"
+  rate-limit:
+    enabled: true
+    capacity: 10000
+
+spring:
+  config:
+    activate:
+      on-profile: test
+  datasource:
+    url: "jdbc:postgresql://localhost:5432/test"
+    username: test
+    password: test
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: "https://accounts.google.com"
+          audiences: "test-client-id"
+  temporal:
+    namespace: default
+    connection:
+      target: localhost:7233
+  ai:
+    embedding:
+      transformer:
+        onnx:
+          model-uri: "file:///nonexistent/model.onnx"
+        tokenizer:
+          uri: "file:///nonexistent/tokenizer.json"
+
+logging:
+  file:
+    name: ${java.io.tmpdir}/faldony-test.log
