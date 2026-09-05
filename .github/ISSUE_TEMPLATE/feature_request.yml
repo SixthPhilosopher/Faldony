@@ -1,0 +1,36 @@
+name: Feature request
+description: Propose a new capability or improvement for Faldony
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Aligned with the project's direction (local-first, single-node,
+        PostgreSQL as the unified data layer, hybrid retrieval, durable
+        workflow orchestration, Kotlin Multiplatform client) — see
+        [CONTRIBUTING.md](../../CONTRIBUTING.md). To take on the work
+        yourself, ask to be assigned to this issue.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What need or pain point does this address?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: How you imagine it working, at a high level.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Any other approaches and why they were ruled out.
+  - type: textarea
+    id: scope
+    attributes:
+      label: How it fits the architecture
+      description: Which part of the stack it touches (backend / search / Temporal / frontend / deploy) and whether it preserves the project's invariants.
