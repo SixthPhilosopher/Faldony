@@ -8,6 +8,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/license-GPLv3-blue.svg" alt="License: GPL-3.0">
+  <img src="https://img.shields.io/badge/KMP-Kotlin%20Multiplatform-7F52FF?logo=kotlin&logoColor=white" alt="KMP">
   <img src="https://img.shields.io/badge/Kotlin-2.3-blue?logo=kotlin&logoColor=white" alt="Kotlin">
   <img src="https://img.shields.io/badge/Spring%20Boot-4.1-green?logo=spring&logoColor=white" alt="Spring Boot">
   <img src="https://img.shields.io/badge/Temporal-1.38-blue?logo=temporal&logoColor=white" alt="Temporal">
@@ -272,7 +273,7 @@ more matches may exist beyond the window.
 | **Data layer** | <img src="https://cdn.simpleicons.org/postgresql" height="16" alt=""> PostgreSQL 17 + <img src="https://cdn.simpleicons.org/postgresql" height="16" alt=""> `pgvector` (HNSW + `halfvec`) &middot; <img src="https://cdn.simpleicons.org/flyway" height="16" alt=""> Flyway &middot; JPA/Hibernate &middot; trigram/FTS indexing |
 | **Document conversion** | Docling (`docling-serve`, self-hosted via <img src="https://cdn.simpleicons.org/docker" height="16" alt=""> Docker) |
 | **Embeddings** | <img src="https://cdn.simpleicons.org/onnx" height="16" alt=""> ONNX `intfloat/multilingual-e5-base`, on-device, 768 dims |
-| **Frontend** | <img src="https://cdn.simpleicons.org/kotlin" height="16" alt=""> Kotlin Multiplatform &middot; Compose Multiplatform (**Wasm/Web**, <img src="https://cdn.simpleicons.org/materialdesign" height="16" alt=""> Material 3 UI + Material Design icons) &middot; <img src="https://cdn.simpleicons.org/ktor" height="16" alt=""> Ktor client with SSE &middot; <img src="https://cdn.simpleicons.org/filekit" height="16" alt=""> FileKit (native file picker) |
+| **Frontend** | <img src="https://cdn.simpleicons.org/kotlin" height="16" alt=""> Kotlin Multiplatform &middot; Compose Multiplatform (**Wasm/Web**, <img src="https://cdn.simpleicons.org/materialdesign" height="16" alt=""> Material 3 UI + Material Design icons) &middot; <img src="https://cdn.simpleicons.org/ktor" height="16" alt=""> Ktor client with SSE &middot; served by <img src="https://cdn.simpleicons.org/nginx" height="16" alt=""> nginx (static bundle + `/api` proxy) |
 | **Deployment** | <img src="https://cdn.simpleicons.org/docker" height="16" alt=""> Docker Compose &middot; <img src="https://cdn.simpleicons.org/gradle" height="16" alt=""> Gradle, single-node, health-checked services |
 
 The entire stack is one `docker-compose.yml`: <img src="https://cdn.simpleicons.org/postgresql" height="16" alt=""> PostgreSQL, <img src="https://cdn.simpleicons.org/temporal" height="16" alt=""> Temporal server, Docling, and the backend itself (plus optional debugging helpers). The embedding model is downloaded once at image build time and cached as an image layer — no runtime downloads, no model cache volume.
